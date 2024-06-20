@@ -83,17 +83,53 @@ class TopologicalSorterTest extends BaseTestCase
         $node1 = new ClassMetadata('1');
         $node2 = new ClassMetadata('2');
         $node3 = new ClassMetadata('3');
+        $node4 = new ClassMetadata('4');
+        $node5 = new ClassMetadata('5');
 
         $sorter->addNode('1', $node1);
         $sorter->addNode('2', $node2);
         $sorter->addNode('3', $node3);
+        $sorter->addNode('4', $node4);
+        $sorter->addNode('5', $node5);
 
         $sorter->addDependency('1', '2');
+        $sorter->addDependency('1', '4');
         $sorter->addDependency('2', '3');
-        $sorter->addDependency('3', '1');
+        $sorter->addDependency('5', '1');
+        $sorter->addDependency('3', '4');
 
         $sortedList  = $sorter->sort();
-        $correctList = [$node3, $node2, $node1];
+        $correctList = [$node4, $node3, $node2, $node1, $node5];
+
+        self::assertSame($correctList, $sortedList);
+
+        $sorter->sort();
+    }
+
+    public function testSortCyclicDependencyWhenNodesAreAddedInAnotherOrder(): void
+    {
+        $sorter = new TopologicalSorter();
+
+        $node1 = new ClassMetadata('1');
+        $node2 = new ClassMetadata('2');
+        $node3 = new ClassMetadata('3');
+        $node4 = new ClassMetadata('4');
+        $node5 = new ClassMetadata('5');
+
+        $sorter->addNode('5', $node5);
+        $sorter->addNode('4', $node4);
+        $sorter->addNode('3', $node3);
+        $sorter->addNode('2', $node2);
+        $sorter->addNode('1', $node1);
+
+        $sorter->addDependency('1', '2');
+        $sorter->addDependency('1', '4');
+        $sorter->addDependency('2', '3');
+        $sorter->addDependency('5', '1');
+        $sorter->addDependency('3', '4');
+
+        $sortedList  = $sorter->sort();
+        $correctList = [$node4, $node3, $node2, $node1, $node5];
 
         self::assertSame($correctList, $sortedList);
 
