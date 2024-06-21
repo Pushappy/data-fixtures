@@ -8,12 +8,9 @@ use Doctrine\Common\DataFixtures\Exception\CircularReferenceException;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use RuntimeException;
 
-use function array_unshift;
 use function count;
-use function get_class;
 use function sprintf;
 use function uasort;
-use function usort;
 
 /**
  * TopologicalSorter is an ordering algorithm for directed graphs (DG) and/or
@@ -34,13 +31,6 @@ class TopologicalSorter
      * @var Vertex[]
      */
     private array $nodeList = [];
-
-    /**
-     * Volatile variable holding cyclic nodes during sorting process.
-     *
-     * @var Vertex[]
-     */
-    private array $cyclicNodeList = [];
 
     /**
      * Volatile variable holding calculated nodes during sorting process.
