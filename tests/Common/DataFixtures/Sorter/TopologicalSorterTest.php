@@ -10,6 +10,12 @@ use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\Tests\Common\DataFixtures\BaseTestCase;
 use RuntimeException;
 
+use function array_map;
+use function array_splice;
+use function array_unshift;
+use function count;
+use function implode;
+
 /**
  * TopologicalSorter tests.
  *
@@ -76,64 +82,71 @@ class TopologicalSorterTest extends BaseTestCase
         self::assertSame($correctList, $sortedList);
     }
 
-    public function testSortCyclicDependency(): void
+    public static function cyclicNodePermutationsDataProvider(): iterable
     {
-        $sorter = new TopologicalSorter();
+        $list[] = new ClassMetadata('1');
+        $list[] = new ClassMetadata('2');
+        $list[] = new ClassMetadata('3');
+        $list[] = new ClassMetadata('4');
+        $list[] = new ClassMetadata('5');
 
-        $node1 = new ClassMetadata('1');
-        $node2 = new ClassMetadata('2');
-        $node3 = new ClassMetadata('3');
-        $node4 = new ClassMetadata('4');
-        $node5 = new ClassMetadata('5');
+        foreach (self::permute($list) as $list) {
+            $label = 'Node order: ' . implode(',', self::nodeNames($list));
 
-        $sorter->addNode('1', $node1);
-        $sorter->addNode('2', $node2);
-        $sorter->addNode('3', $node3);
-        $sorter->addNode('4', $node4);
-        $sorter->addNode('5', $node5);
-
-        $sorter->addDependency('1', '2');
-        $sorter->addDependency('1', '4');
-        $sorter->addDependency('2', '3');
-        $sorter->addDependency('5', '1');
-        $sorter->addDependency('3', '4');
-
-        $sortedList  = $sorter->sort();
-        $correctList = [$node4, $node3, $node2, $node1, $node5];
-
-        self::assertSame($correctList, $sortedList);
-
-        $sorter->sort();
+            yield $label => [$list];
+        }
     }
 
-    public function testSortCyclicDependencyWhenNodesAreAddedInAnotherOrder(): void
+    /** @param ClassMetadata[] $list */
+    private static function nodeNames(array $list): array
+    {
+        return array_map(static function (ClassMetadata $node) {
+            return $node->getName();
+        }, $list);
+    }
+
+    private static function permute(array $items, array $permutation = [], array &$result = []): array
+    {
+        if (empty($items)) {
+            $result[] = $permutation;
+        } else {
+            for ($i = count($items) - 1; $i >= 0; --$i) {
+                $newItems       = $items;
+                $newPermutation = $permutation;
+                [$item]         = array_splice($newItems, $i, 1);
+                array_unshift($newPermutation, $item);
+                self::permute($newItems, $newPermutation, $result);
+            }
+        }
+
+        return $result;
+    }
+
+    /** @dataProvider cyclicNodePermutationsDataProvider */
+    public function testSortCyclicDependency(array $nodes): void
     {
         $sorter = new TopologicalSorter();
 
-        $node1 = new ClassMetadata('1');
-        $node2 = new ClassMetadata('2');
-        $node3 = new ClassMetadata('3');
-        $node4 = new ClassMetadata('4');
-        $node5 = new ClassMetadata('5');
-
-        $sorter->addNode('5', $node5);
-        $sorter->addNode('4', $node4);
-        $sorter->addNode('3', $node3);
-        $sorter->addNode('2', $node2);
-        $sorter->addNode('1', $node1);
+        foreach ($nodes as $node) {
+            $sorter->addNode($node->getName(), $node);
+        }
 
         $sorter->addDependency('1', '2');
-        $sorter->addDependency('1', '4');
         $sorter->addDependency('2', '3');
-        $sorter->addDependency('5', '1');
         $sorter->addDependency('3', '4');
+        $sorter->addDependency('4', '2');
+        $sorter->addDependency('2', '5');
 
-        $sortedList  = $sorter->sort();
-        $correctList = [$node4, $node3, $node2, $node1, $node5];
+        $sortedList = self::nodeNames($sorter->sort());
 
-        self::assertSame($correctList, $sortedList);
+        self::assertCount(5, $sortedList);
+        self::assertSame('5', $sortedList[0]);
+        self::assertSame('1', $sortedList[4]);
 
-        $sorter->sort();
+        // these a cyclic and sort order is based on the order of the nodeList, and is a best effort
+        self::assertContains('2', $sortedList);
+        self::assertContains('3', $sortedList);
+        self::assertContains('4', $sortedList);
     }
 
     public function testFailureSortCyclicDependency(): void

@@ -8,8 +8,12 @@ use Doctrine\Common\DataFixtures\Exception\CircularReferenceException;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use RuntimeException;
 
+use function array_unshift;
+use function count;
 use function get_class;
 use function sprintf;
+use function uasort;
+use function usort;
 
 /**
  * TopologicalSorter is an ordering algorithm for directed graphs (DG) and/or
@@ -30,6 +34,13 @@ class TopologicalSorter
      * @var Vertex[]
      */
     private array $nodeList = [];
+
+    /**
+     * Volatile variable holding cyclic nodes during sorting process.
+     *
+     * @var Vertex[]
+     */
+    private array $cyclicNodeList = [];
 
     /**
      * Volatile variable holding calculated nodes during sorting process.
@@ -101,6 +112,9 @@ class TopologicalSorter
      */
     public function sort()
     {
+        uasort($this->nodeList, static function (Vertex $a, Vertex $b) {
+            return count($a->dependencyList) > count($b->dependencyList) ? 1 : -1;
+        });
         foreach ($this->nodeList as $definition) {
             if ($definition->state !== Vertex::NOT_VISITED) {
                 continue;
@@ -186,8 +200,8 @@ EXCEPTION
     {
         if (! isset($this->nodeList[$dependency])) {
             throw new RuntimeException(sprintf(
-                'Fixture "%s" has a dependency of fixture "%s", but it not listed to be loaded.',
-                get_class($definition->value),
+                'Fixture "%s" has a dependency of fixture "%s", but it\'s not listed to be loaded.',
+                $definition->value->getName(),
                 $dependency,
             ));
         }
