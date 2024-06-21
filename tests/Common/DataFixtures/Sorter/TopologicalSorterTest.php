@@ -11,6 +11,7 @@ use Doctrine\Tests\Common\DataFixtures\BaseTestCase;
 use RuntimeException;
 
 use function array_map;
+use function array_search;
 use function array_splice;
 use function array_unshift;
 use function count;
@@ -137,13 +138,21 @@ class TopologicalSorterTest extends BaseTestCase
         $sorter->addDependency('4', '2');
         $sorter->addDependency('2', '5');
 
-        $sortedList = self::nodeNames($sorter->sort());
+        $sortedList    = self::nodeNames($sorter->sort());
+        $node1Position = array_search('1', $sortedList);
+        $node2Position = array_search('2', $sortedList);
+        $node3Position = array_search('3', $sortedList);
+        $node4Position = array_search('4', $sortedList);
+        $node5Position = array_search('5', $sortedList);
 
-        self::assertCount(5, $sortedList);
-        self::assertSame('5', $sortedList[0]);
-        self::assertSame('1', $sortedList[4]);
+        self::assertTrue($node5Position < $node2Position, '5 should come before 2');
+        self::assertTrue($node5Position < $node3Position, '5 should come before 3');
+        self::assertTrue($node5Position < $node4Position, '5 should come before 4');
+        self::assertTrue($node1Position > $node5Position, '1 should come after 2');
+        self::assertTrue($node1Position > $node3Position, '1 should come after 3');
+        self::assertTrue($node1Position > $node4Position, '1 should come after 4');
 
-        // these a cyclic and sort order is based on the order of the nodeList, and is a best effort
+        // these a cyclic and sort order is based on the order of the nodes
         self::assertContains('2', $sortedList);
         self::assertContains('3', $sortedList);
         self::assertContains('4', $sortedList);
