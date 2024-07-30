@@ -186,7 +186,7 @@ EXCEPTION
         $this->sortedNodeList[] = $definition->value;
     }
 
-    public function getDefinition(string $dependency, Vertex $definition): Vertex
+    private function getDefinition(string $dependency, Vertex $definition): Vertex
     {
         if (! isset($this->nodeList[$dependency])) {
             throw new RuntimeException(sprintf(
