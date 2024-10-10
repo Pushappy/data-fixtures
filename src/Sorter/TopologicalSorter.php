@@ -8,8 +8,9 @@ use Doctrine\Common\DataFixtures\Exception\CircularReferenceException;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use RuntimeException;
 
-use function get_class;
+use function count;
 use function sprintf;
+use function uasort;
 
 /**
  * TopologicalSorter is an ordering algorithm for directed graphs (DG) and/or
@@ -101,6 +102,9 @@ class TopologicalSorter
      */
     public function sort()
     {
+        uasort($this->nodeList, static function (Vertex $a, Vertex $b) {
+            return count($a->dependencyList) > count($b->dependencyList) ? 1 : -1;
+        });
         foreach ($this->nodeList as $definition) {
             if ($definition->state !== Vertex::NOT_VISITED) {
                 continue;
@@ -132,15 +136,7 @@ class TopologicalSorter
         $definition->state = Vertex::IN_PROGRESS;
 
         foreach ($definition->dependencyList as $dependency) {
-            if (! isset($this->nodeList[$dependency])) {
-                throw new RuntimeException(sprintf(
-                    'Fixture "%s" has a dependency of fixture "%s", but it not listed to be loaded.',
-                    get_class($definition->value),
-                    $dependency,
-                ));
-            }
-
-            $childDefinition = $this->nodeList[$dependency];
+            $childDefinition = $this->getDefinition($dependency, $definition);
 
             // allow self referencing classes
             if ($definition === $childDefinition) {
@@ -167,6 +163,18 @@ EXCEPTION
                         );
                     }
 
+                    // first do the rest of the unvisited children of the "in_progress" child before we continue
+                    // with the current one, to be sure that there are no other dependencies that need
+                    // to be cleared before this ($definition) node
+                    foreach ($childDefinition->dependencyList as $childDependency) {
+                        $nestedChildDefinition = $this->getDefinition($childDependency, $childDefinition);
+                        if ($nestedChildDefinition->state !== Vertex::NOT_VISITED) {
+                            continue;
+                        }
+
+                        $this->visit($nestedChildDefinition);
+                    }
+
                     break;
                 case Vertex::NOT_VISITED:
                     $this->visit($childDefinition);
@@ -176,5 +184,18 @@ EXCEPTION
         $definition->state = Vertex::VISITED;
 
         $this->sortedNodeList[] = $definition->value;
+    }
+
+    private function getDefinition(string $dependency, Vertex $definition): Vertex
+    {
+        if (! isset($this->nodeList[$dependency])) {
+            throw new RuntimeException(sprintf(
+                'Fixture "%s" has a dependency of fixture "%s", but it\'s not listed to be loaded.',
+                $definition->value->getName(),
+                $dependency,
+            ));
+        }
+
+        return $this->nodeList[$dependency];
     }
 }
