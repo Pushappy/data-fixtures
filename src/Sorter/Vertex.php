@@ -18,7 +18,7 @@ class Vertex
     public const IN_PROGRESS = 1;
     public const VISITED     = 2;
 
-    /** @psalm-var self::* */
+    /** @phpstan-var self::* */
     public int $state = self::NOT_VISITED;
 
     /** Actual node value. */
